@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#FFF8FC" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta
+      name="description"
+      content="好きな歌詞から、韓国語を少しずつ。あなたのための歌詞ライブラリ。"
+    />
+    <title>K-LYRIC — 歌詞で、韓国語を。</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <a href="#library" class="brand"
+          ><span class="brand-icon">♫</span>K-LYRIC<span class="brand-dot"
+            >●</span
+          ></a
+        ><span class="header-note">MY LITTLE K-POP LIBRARY</span>
+      </header>
+      <main id="main" tabindex="-1"><p>ライブラリを読み込んでいます…</p></main>
+      <nav aria-label="メインナビゲーション">
+        <a href="#library" data-nav="library"><span>♫</span>ライブラリ</a
+        ><a href="#weak" data-nav="weak"><span>♡</span>苦手単語</a
+        ><a href="#search" data-nav="search"><span>⌕</span>単語検索</a
+        ><a href="#import" data-nav="import"><span>＋</span>取り込み</a>
+      </nav>
+    </div>
+    <dialog id="dialog">
+      <div id="dialog-body"></div>
+      <button id="dialog-close" class="secondary">閉じる</button>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

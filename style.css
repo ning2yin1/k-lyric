@@ -1,0 +1,733 @@
+:root {
+  --bg: #fff8fc;
+  --pink: #f4b6d2;
+  --lavender: #c8b9ea;
+  --ink: #4a4058;
+  --muted: #8b8095;
+  --line: #eee5ee;
+  --accent: #9d5d89;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--bg);
+  scroll-behavior: auto;
+}
+body {
+  margin: 0;
+  color: var(--ink);
+  font:
+    15px/1.7 -apple-system,
+    BlinkMacSystemFont,
+    "Hiragino Kaku Gothic ProN",
+    "Noto Sans KR",
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    sans-serif;
+  overscroll-behavior-y: none;
+}
+button,
+a,
+input,
+textarea,
+label {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button,
+a {
+  cursor: pointer;
+}
+button {
+  border: 0;
+  border-radius: 14px;
+  min-height: 46px;
+  padding: 11px 19px;
+  background: var(--ink);
+  color: white;
+  font-weight: 600;
+}
+button:hover {
+  filter: brightness(0.96);
+}
+button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--lavender);
+  outline-offset: 3px;
+}
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: white;
+  padding: 14px 16px;
+  font-size: 16px;
+  outline: none;
+}
+textarea {
+  resize: vertical;
+  min-height: 270px;
+  line-height: 1.65;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: 30px;
+  line-height: 1.4;
+  letter-spacing: -1px;
+}
+h2 {
+  font-size: 20px;
+}
+h3 {
+  font-size: 17px;
+}
+.app {
+  max-width: 1040px;
+  margin: auto;
+}
+header {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.brand-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: var(--pink);
+  color: white;
+  border-radius: 12px;
+  font-size: 29px;
+}
+.brand-dot {
+  color: var(--lavender);
+  font-size: 9px;
+  margin-left: -5px;
+}
+.header-note,
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.header-note {
+  color: var(--muted);
+}
+main {
+  padding: 40px 48px 135px;
+  min-height: 80vh;
+  animation: appear 0.22s ease;
+}
+main:focus {
+  outline: none;
+}
+.intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.intro p {
+  color: var(--muted);
+  margin-top: 10px;
+  font-size: 13px;
+}
+.eyebrow {
+  display: block;
+  margin-bottom: 9px;
+}
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(110deg, #f9dce9, #ede4fa);
+  border-radius: 24px;
+  padding: 28px 30px;
+  margin: 26px 0 30px;
+  min-height: 170px;
+}
+.hero h2 {
+  font-size: 22px;
+  line-height: 1.6;
+}
+.hero p {
+  font-size: 13px;
+  margin-top: 9px;
+  color: #83728e;
+}
+.hero .music-art {
+  position: absolute;
+  right: 38px;
+  top: 1px;
+  font-size: 110px;
+  transform: rotate(-15deg);
+  color: #fff9;
+  line-height: 1.5;
+}
+.hero small {
+  display: block;
+  margin-top: 16px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 26px 0 15px;
+}
+.section-title h2 {
+  font-size: 16px;
+}
+.muted,
+small {
+  color: var(--muted);
+}
+.count {
+  font-size: 12px;
+  color: var(--muted);
+}
+.song-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.song-card {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 23px;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  min-width: 0;
+}
+.song-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 9px 25px #7b54700b;
+}
+.album {
+  flex-shrink: 0;
+  width: 76px;
+  height: 88px;
+  background: linear-gradient(145deg, #eadff6, #f8d8e5);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 37px;
+  color: white;
+  position: relative;
+}
+.album:after {
+  content: "K-L";
+  position: absolute;
+  bottom: 4px;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #ac8ba7;
+}
+.song-card:nth-child(even) .album {
+  background: linear-gradient(145deg, #f9dce8, #e6e2fa);
+}
+.song-info {
+  min-width: 0;
+}
+.song-info h3 {
+  overflow-wrap: anywhere;
+}
+.song-info p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 2px 0 9px;
+}
+.pills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-size: 10px;
+  background: #f7f3fa;
+  color: #92809e;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.pill.pink {
+  background: #fff0f6;
+  color: #bc7d9c;
+}
+.secondary {
+  background: #f0eaf5;
+  color: var(--ink);
+}
+.pink-button {
+  background: #f4b6d2;
+  color: #604351;
+}
+.text-button {
+  background: none;
+  color: var(--muted);
+  padding: 8px 0;
+  font-size: 13px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.between {
+  justify-content: space-between;
+}
+.back {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 22px;
+}
+.tabs {
+  display: flex;
+  border-radius: 13px;
+  background: #eee8f1;
+  padding: 4px;
+  margin: 26px 0;
+}
+.tabs button {
+  flex: 1;
+  background: transparent;
+  color: var(--muted);
+  min-height: 40px;
+  padding: 7px;
+}
+.tabs .selected {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 2px 7px #4a405809;
+}
+.lyrics {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 8px 25px;
+}
+.lyric {
+  padding: 22px 0;
+  border-bottom: 1px solid #f5eff5;
+}
+.lyric:last-child {
+  border: 0;
+}
+.original {
+  font-size: 20px;
+  line-height: 1.8;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.translation {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 7px;
+  white-space: pre-wrap;
+}
+.flashcard {
+  width: 100%;
+  min-height: 300px;
+  background: linear-gradient(135deg, #fff, #f9f3fd);
+  color: var(--ink);
+  border: 1px solid #e9dfee;
+  border-radius: 24px;
+  box-shadow: 0 12px 40px #bfa2bd13;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+  animation: appear 0.2s;
+}
+.flashcard.flipped {
+  background: linear-gradient(135deg, #fff1f8, #f0eafa);
+}
+.flashcard .word {
+  font-size: 42px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  font-weight: 600;
+}
+.flashcard .meaning {
+  font-size: 25px;
+}
+.flashcard small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.flashcard .pron {
+  font-size: 19px;
+  color: #8d739f;
+}
+.card-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+.weak-toggle {
+  background: white;
+  color: var(--accent);
+  border: 1px solid #edcfe0;
+}
+.weak-toggle.active {
+  background: #f9dce9;
+}
+.panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+  margin: 18px 0;
+}
+.panel p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 8px 0 17px;
+}
+.step {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 7px;
+}
+.panel h2 {
+  font-size: 18px;
+}
+.panel button {
+  margin-top: 12px;
+}
+.notice {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 20px 0;
+}
+.empty {
+  text-align: center;
+  padding: 50px 16px;
+  color: var(--muted);
+  border: 1px dashed #dfd1e2;
+  border-radius: 20px;
+  margin-top: 20px;
+}
+.empty b {
+  font-size: 32px;
+  display: block;
+  color: var(--lavender);
+  margin-bottom: 10px;
+}
+.empty a {
+  display: inline-block;
+  margin-top: 15px;
+  color: var(--accent);
+}
+.result {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 10px 0;
+}
+.result strong {
+  font-size: 21px;
+}
+.result small {
+  display: block;
+  font-size: 11px;
+}
+.result .meaning {
+  font-size: 12px;
+  color: var(--muted);
+}
+nav {
+  position: fixed;
+  z-index: 5;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  width: min(100%, 1040px);
+  padding: 12px 28px calc(12px + env(safe-area-inset-bottom));
+  background: #fffdfefa;
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(16px);
+}
+nav a {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+  color: var(--muted);
+  gap: 2px;
+  border-radius: 12px;
+  padding: 4px;
+}
+nav a span {
+  font-size: 24px;
+  line-height: 1.2;
+}
+nav a.active {
+  color: var(--accent);
+  background: #fff0f7;
+}
+dialog {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 22px;
+  padding: 26px;
+  max-width: 540px;
+  width: calc(100% - 32px);
+  max-height: 85dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+}
+dialog::backdrop {
+  background: #3a2b4655;
+  backdrop-filter: blur(4px);
+}
+dialog h2 {
+  margin-bottom: 15px;
+}
+dialog .example {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+dialog .example p {
+  margin: 7px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+dialog .grammar {
+  font-size: 13px;
+  background: white;
+  border-radius: 12px;
+  padding: 13px;
+}
+dialog button {
+  margin-top: 15px;
+}
+#dialog-close {
+  width: 100%;
+}
+#toast {
+  position: fixed;
+  z-index: 20;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: white;
+  border-radius: 13px;
+  padding: 12px 20px;
+  font-size: 13px;
+  max-width: 90%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+#toast.show {
+  opacity: 1;
+}
+.error {
+  color: #a83f69;
+  font-size: 13px;
+  white-space: pre-wrap;
+  margin-top: 14px;
+}
+.file-label {
+  display: inline-block;
+  padding: 11px 19px;
+  border-radius: 14px;
+  background: #f0eaf5;
+  font-weight: 600;
+  cursor: pointer;
+}
+.danger {
+  color: #a44870;
+  background: #fff0f5;
+}
+.footer-note {
+  font-size: 11px;
+  text-align: center;
+  color: #a99bac;
+  margin-top: 34px;
+}
+.search-wrap {
+  position: relative;
+}
+.search-wrap input {
+  padding-left: 42px;
+}
+.search-wrap:before {
+  content: "⌕";
+  position: absolute;
+  left: 17px;
+  top: 7px;
+  font-size: 24px;
+  color: var(--muted);
+}
+@keyframes appear {
+  from {
+    opacity: 0.3;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 600px) {
+  header {
+    padding: 20px 23px;
+    height: 83px;
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
+  .brand {
+    font-size: 21px;
+  }
+  .header-note {
+    display: none;
+  }
+  main {
+    padding: 28px 23px 125px;
+  }
+  h1 {
+    font-size: 27px;
+  }
+  .intro {
+    align-items: flex-start;
+  }
+  .intro button {
+    font-size: 12px;
+    padding: 10px 13px;
+  }
+  .song-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .song-card {
+    padding: 20px;
+  }
+  .hero {
+    padding: 24px;
+    min-height: 180px;
+  }
+  .hero h2 {
+    font-size: 21px;
+  }
+  .hero .music-art {
+    right: 14px;
+    top: 13px;
+    font-size: 100px;
+    opacity: 0.75;
+  }
+  .hero p {
+    max-width: 210px;
+    font-size: 12px;
+  }
+  .hero h2,
+  .hero p,
+  .hero small {
+    position: relative;
+    z-index: 1;
+  }
+  .panel {
+    padding: 20px;
+  }
+  .original {
+    font-size: 19px;
+  }
+  .lyrics {
+    padding: 4px 20px;
+  }
+  .card-controls button {
+    padding: 10px 14px;
+  }
+  .flashcard {
+    min-height: 300px;
+  }
+  nav {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .brand-icon {
+    width: 33px;
+    height: 33px;
+  }
+  .intro p {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.intro > div {
+  min-width: 0;
+}
+.intro h1 {
+  overflow-wrap: anywhere;
+}
+.intro > button {
+  flex-shrink: 0;
+}
+dialog p {
+  overflow-wrap: anywhere;
+}
