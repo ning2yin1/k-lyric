@@ -28,7 +28,13 @@ const fs = require("node:fs/promises");
         { ...demo, id: "legacy-a" },
         { ...demo, id: "legacy-b", song: "2曲目" },
       ],
-      weak: [wordKey(demo.cards[0])],
+      weak: [
+        JSON.stringify([
+          demo.cards[0].word,
+          demo.cards[0].pos,
+          demo.cards[0].meaning,
+        ]),
+      ],
       initialized: true,
     });
   });
@@ -85,12 +91,13 @@ const fs = require("node:fs/promises");
   await page.getByText("まだ苦手単語はありません").waitFor();
   await page.goto(base + "#search");
   await page.locator("#word-search").fill("光");
-  assert.equal(await page.locator(".result").count(), 2);
+  assert.equal(await page.locator(".result").count(), 1);
   assert.equal(
     await page.locator("[data-learning=mastered][aria-pressed=true]").count(),
-    2,
+    1,
   );
   await page.locator(".result-link").first().click();
+  await page.locator("dialog .back").first().click();
   await page.locator("#list-tab[aria-selected=true]").waitFor();
   await page.locator("#lyrics-tab").click();
   assert.equal(await page.locator(".lyric").count(), 3);
@@ -133,7 +140,7 @@ const fs = require("node:fs/promises");
   const backup = JSON.parse(
     await fs.readFile("/tmp/k-lyric-mastered.json", "utf8"),
   );
-  assert.equal(backup.version, 2);
+  assert.equal(backup.version, 3);
   assert.equal(backup.mastered.length, 5);
   assert.equal(backup.weak.length, 0);
   await page
@@ -145,16 +152,24 @@ const fs = require("node:fs/promises");
   await page.locator("#cards-tab").click();
   await page.getByText("この曲の単語はすべて覚えました！").waitFor();
   // Version 1 files still restore without discarding songs or weak marks.
-  const old = { ...backup, version: 1, weak: [backup.mastered[0]] };
+  const old = {
+    ...backup,
+    version: 1,
+    weak: [
+      JSON.stringify([
+        backup.songs[0].cards[0].word,
+        backup.songs[0].cards[0].pos,
+        backup.songs[0].cards[0].meaning,
+      ]),
+    ],
+  };
   delete old.mastered;
   await page.goto(base + "#import");
-  await page
-    .locator("#restore-file")
-    .setInputFiles({
-      name: "v1.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(old)),
-    });
+  await page.locator("#restore-file").setInputFiles({
+    name: "v1.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(old)),
+  });
   await page.locator("#confirm-restore").click();
   await page.locator(".song-card").first().waitFor();
   await page.locator(".song-card").first().click();
@@ -166,7 +181,7 @@ const fs = require("node:fs/promises");
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: legacy data migration, global mastered sync, exclusive toggles, next card, all mastered, counts, list/search editing, weak study, persistence, v2 backup and v1 restore, mobile widths.",
+    "PASS: legacy data migration, global mastered sync, exclusive toggles, next card, all mastered, counts, list/search editing, weak study, persistence, v3 backup and v1 restore, mobile widths.",
   );
   await browser.close();
 })().catch((e) => {

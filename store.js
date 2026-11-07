@@ -1,8 +1,80 @@
 export const normalize = (s) =>
   s.normalize("NFKC").trim().toLocaleLowerCase("ja");
+const posAliases = {
+  verb: "動詞",
+  v: "動詞",
+  동사: "動詞",
+  adjective: "形容詞",
+  adj: "形容詞",
+  형용사: "形容詞",
+  noun: "名詞",
+  n: "名詞",
+  명사: "名詞",
+  pronoun: "代名詞",
+  대명사: "代名詞",
+  adverb: "副詞",
+  adv: "副詞",
+  부사: "副詞",
+  numeral: "数詞",
+  수사: "数詞",
+  determiner: "連体詞",
+  관형사: "連体詞",
+  interjection: "感動詞",
+  감탄사: "感動詞",
+};
+export const normalizePos = (p) => {
+  const key = normalize(p);
+  return Object.hasOwn(posAliases, key) ? posAliases[key] : key;
+};
+// Meanings are context-dependent glosses, not identity. Explicit sense_id separates homonyms.
 export const wordKey = (c) =>
-  JSON.stringify([normalize(c.word), normalize(c.pos), normalize(c.meaning)]);
-// Preserve the existing lexical identity, including meaning, for both states.
+  JSON.stringify([
+    normalize(c.word),
+    normalizePos(c.pos),
+    ...(c.sense_id ? [normalize(c.sense_id)] : []),
+  ]);
+export function learningStatus(state, card) {
+  const key = wordKey(card);
+  return (state.weak || []).includes(key)
+    ? "weak"
+    : (state.mastered || []).includes(key)
+      ? "mastered"
+      : "unset";
+}
+export function migrateLearningState(state) {
+  if (state.learningVersion === 3) return state;
+  const convert = (key) => {
+    try {
+      const parts = JSON.parse(key);
+      if (
+        !Array.isArray(parts) ||
+        parts.length !== 3 ||
+        !parts.every((x) => typeof x === "string")
+      )
+        return key;
+      return wordKey({ word: parts[0], pos: parts[1] });
+    } catch {
+      return key;
+    }
+  };
+  const weak = [...new Set((state.weak || []).map(convert))];
+  const mastered = [...new Set((state.mastered || []).map(convert))].filter(
+    (k) => !weak.includes(k),
+  );
+  return {
+    ...state,
+    learningVersion: 3,
+    weak,
+    mastered,
+    learningMigration: {
+      weak: [...(state.weak || [])],
+      mastered: [...(state.mastered || [])],
+      previous: state.learningMigration || null,
+      rule: "conflict-prefers-weak",
+    },
+  };
+}
+// A single state transition is shared by every screen.
 export function toggleLearningState(state, card, kind) {
   const key = wordKey(card);
   const active = (state[kind] || []).includes(key);
@@ -59,9 +131,10 @@ export function validateSong(s, path = "曲") {
     const out = {};
     for (const k of ["word", "meaning", "pronunciation", "pos"])
       out[k] = text(c, k, p);
-    if (!/[가-힣]/u.test(c.word))
+    if (c.sense_id !== undefined) out.sense_id = text(c, "sense_id", p);
+    if (!/[가-힣]/u.test(normalize(c.word)))
       throw Error(`${p}.word は韓国語を含む辞書形にしてください。`);
-    if (!/^[가-힣ㄱ-ㅎㅏ-ㅣ\s\[\](),·-]+$/u.test(c.pronunciation))
+    if (!/^[가-힣ㄱ-ㅎㅏ-ㅣ\s\[\](),·-]+$/u.test(normalize(c.pronunciation)))
       throw Error(`${p}.pronunciation はハングル表記にしてください。`);
     if (
       !Array.isArray(c.examples) ||
@@ -87,8 +160,8 @@ export function validateSong(s, path = "曲") {
   return clean;
 }
 export function validateBackup(b) {
-  if (!object(b) || b.app !== "K-LYRIC" || ![1, 2].includes(b.version))
-    throw Error("K-LYRIC バージョン1または2のバックアップを選択してください。");
+  if (!object(b) || b.app !== "K-LYRIC" || ![1, 2, 3].includes(b.version))
+    throw Error("K-LYRIC バージョン1〜3のバックアップを選択してください。");
   if (!Array.isArray(b.songs) || b.songs.length > 1000)
     throw Error("songs は1,000曲以下の配列にしてください。");
   const songs = b.songs.map((s, i) => ({
@@ -97,7 +170,19 @@ export function validateBackup(b) {
   }));
   if (new Set(songs.map(songKey)).size !== songs.length)
     throw Error("同じ曲名・アーティストの曲が重複しています。");
-  const keys = new Set(songs.flatMap((s) => s.cards.map(wordKey)));
+  const keys = new Set(
+    songs.flatMap((s) =>
+      s.cards.map((c) =>
+        b.version < 3
+          ? JSON.stringify([
+              normalize(c.word),
+              normalize(c.pos),
+              normalize(c.meaning),
+            ])
+          : wordKey(c),
+      ),
+    ),
+  );
   if (
     !Array.isArray(b.weak) ||
     !b.weak.every((k) => typeof k === "string" && keys.has(k))
@@ -109,14 +194,34 @@ export function validateBackup(b) {
     !mastered.every((k) => typeof k === "string" && keys.has(k))
   )
     throw Error("覚えたマークのデータが正しくありません。");
-  if (mastered.some((k) => b.weak.includes(k)))
+  if (b.version === 3 && mastered.some((k) => b.weak.includes(k)))
     throw Error("同じ単語に苦手と覚えたを同時に設定することはできません。");
-  return {
+  const restored = {
     songs,
     weak: [...new Set(b.weak)],
     mastered: [...new Set(mastered)],
     initialized: true,
   };
+  if (b.version === 3) {
+    if (
+      b.learningMigration !== undefined &&
+      (!object(b.learningMigration) ||
+        !Array.isArray(b.learningMigration.weak) ||
+        !Array.isArray(b.learningMigration.mastered) ||
+        ![...b.learningMigration.weak, ...b.learningMigration.mastered].every(
+          (k) => typeof k === "string",
+        ))
+    )
+      throw Error("移行履歴の形式が正しくありません。");
+    return {
+      ...restored,
+      learningVersion: 3,
+      ...(b.learningMigration
+        ? { learningMigration: b.learningMigration }
+        : {}),
+    };
+  }
+  return migrateLearningState(restored);
 }
 export function parseJSON(source) {
   if (source.length > 20 * 1024 * 1024)

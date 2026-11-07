@@ -7,6 +7,8 @@ import {
   wordKey,
   songKey,
   parseJSON,
+  migrateLearningState,
+  learningStatus,
 } from "../store.js";
 test("valid import preserves repeated lyric lines and separate examples", () => {
   const result = validateSong(demo);
@@ -27,11 +29,16 @@ test("reject malformed import and wrong field types", () => {
   assert.throws(() => parseJSON("```json\n{}\n```"));
   assert.throws(() => parseJSON("{"));
 });
-test("identity shares exact lexical meaning across songs and distinguishes homographs", () => {
+test("identity normalizes POS and Unicode while explicit senses distinguish homonyms", () => {
   const c = demo.cards[0];
   assert.equal(wordKey(c), wordKey({ ...c, examples: [] }));
   assert.notEqual(wordKey(c), wordKey({ ...c, pos: "動詞" }));
-  assert.notEqual(wordKey(c), wordKey({ ...c, meaning: "別の意味" }));
+  assert.equal(wordKey(c), wordKey({ ...c, meaning: "別の訳語" }));
+  assert.notEqual(wordKey(c), wordKey({ ...c, sense_id: "別の語義" }));
+  assert.equal(
+    wordKey({ ...c, pos: " Noun ", word: c.word.normalize("NFD") }),
+    wordKey(c),
+  );
   assert.equal(
     songKey(demo),
     songKey({ ...demo, song: " " + demo.song + " " }),
@@ -42,7 +49,13 @@ test("backup validates all data before replacement, ignores foreign fields", () 
     app: "K-LYRIC",
     version: 1,
     songs: [demo],
-    weak: [wordKey(demo.cards[0])],
+    weak: [
+      JSON.stringify([
+        demo.cards[0].word,
+        demo.cards[0].pos,
+        demo.cards[0].meaning,
+      ]),
+    ],
   };
   const result = validateBackup(backup);
   assert.equal(result.songs.length, 1);
@@ -65,7 +78,7 @@ test("mastered backup validates identities and rejects conflicting states", () =
   const key = wordKey(demo.cards[0]);
   const backup = {
     app: "K-LYRIC",
-    version: 2,
+    version: 3,
     songs: [demo],
     weak: [],
     mastered: [key],
@@ -78,7 +91,17 @@ test("mastered backup validates identities and rejects conflicting states", () =
   ])
     assert.throws(() => validateBackup(invalid));
   assert.deepEqual(
-    validateBackup({ ...backup, version: 1, weak: [key] }).mastered,
+    validateBackup({
+      ...backup,
+      version: 1,
+      weak: [
+        JSON.stringify([
+          demo.cards[0].word,
+          demo.cards[0].pos,
+          demo.cards[0].meaning,
+        ]),
+      ],
+    }).mastered,
     [],
   );
 });
@@ -99,4 +122,67 @@ test("learning states toggle exclusively without changing songs or other words",
   assert.deepEqual(weak.mastered, []);
   assert.ok(weak.weak.includes(key));
   assert.ok(!toggleLearningState(weak, card, "weak").weak.includes(key));
+});
+
+test("legacy gloss and POS variants migrate atomically and retain conflicting original records", () => {
+  const a = JSON.stringify([" 사랑하다 ", "Verb", "愛する"]),
+    b = JSON.stringify(["사랑하다", "動詞", "愛している"]);
+  const old = { songs: [demo], weak: [a], mastered: [b] };
+  const next = migrateLearningState(old);
+  assert.equal(next.songs, old.songs);
+  assert.equal(next.weak.length, 1);
+  assert.equal(next.mastered.length, 0);
+  assert.deepEqual(next.learningMigration.weak, [a]);
+  assert.deepEqual(next.learningMigration.mastered, [b]);
+  assert.equal(learningStatus(next, { word: "사랑하다", pos: "verb" }), "weak");
+  assert.equal(migrateLearningState(next), next);
+  assert.deepEqual(old.mastered, [b]);
+  const restored = validateBackup({
+    app: "K-LYRIC",
+    version: 2,
+    songs: [
+      {
+        ...demo,
+        cards: [
+          {
+            ...demo.cards[0],
+            word: "사랑하다",
+            pos: "Verb",
+            meaning: "愛する",
+          },
+        ],
+      },
+    ],
+    weak: [],
+    mastered: [JSON.stringify(["사랑하다", "verb", "愛する"])],
+  });
+  assert.equal(
+    learningStatus(restored, { word: "사랑하다", pos: "動詞" }),
+    "mastered",
+  );
+});
+
+test("decomposed Hangul remains importable and explicit homonym IDs survive backup", () => {
+  const song = {
+    ...demo,
+    cards: [
+      {
+        ...demo.cards[0],
+        word: demo.cards[0].word.normalize("NFD"),
+        pronunciation: demo.cards[0].pronunciation.normalize("NFD"),
+        sense_id: "light",
+      },
+    ],
+  };
+  const clean = validateSong(song);
+  assert.equal(clean.cards[0].sense_id, "light");
+  const b = validateBackup({
+    app: "K-LYRIC",
+    version: 3,
+    songs: [song],
+    weak: [],
+    mastered: [wordKey(song.cards[0])],
+  });
+  assert.equal(b.songs[0].cards[0].word, song.cards[0].word);
+  assert.equal(b.mastered.length, 1);
 });

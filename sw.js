@@ -1,4 +1,4 @@
-const CACHE = "k-lyric-shell-v2";
+const CACHE = "k-lyric-shell-v3";
 const ASSETS = [
   "./",
   "./index.html",

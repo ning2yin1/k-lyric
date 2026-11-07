@@ -2,6 +2,8 @@ import { demo, template } from "./data.js";
 import {
   normalize,
   toggleLearningState,
+  learningStatus,
+  migrateLearningState,
   wordKey,
   songKey,
   validateSong,
@@ -21,7 +23,13 @@ const esc = (s) =>
         c
       ],
   );
-let state = { songs: [], weak: [], mastered: [], initialized: true },
+let state = {
+    songs: [],
+    weak: [],
+    mastered: [],
+    learningVersion: 3,
+    initialized: true,
+  },
   cardIndex = 0,
   flipped = false,
   currentMode = "lyrics",
@@ -29,7 +37,9 @@ let state = { songs: [], weak: [], mastered: [], initialized: true },
   currentSong = null,
   route = "",
   toastTimer,
-  busy = false;
+  busy = false,
+  wordFilter = "all",
+  updateWords = null;
 function toast(message) {
   $("#toast").textContent = message;
   $("#toast").classList.add("show");
@@ -70,8 +80,8 @@ async function safe(action) {
     busy = false;
   }
 }
-const isWeak = (c) => state.weak.includes(wordKey(c));
-const isMastered = (c) => state.mastered.includes(wordKey(c));
+const isWeak = (c) => learningStatus(state, c) === "weak";
+const isMastered = (c) => learningStatus(state, c) === "mastered";
 const allCards = () =>
   state.songs.flatMap((song) =>
     song.cards.map((card, index) => ({ song, card, index })),
@@ -233,7 +243,7 @@ function renderCard(container) {
       const previous = queue[cardIndex];
       await commit(toggleLearningState(state, card, kind));
       flipped = false;
-      if (route === "weak-study") weakPage(true);
+      if (route === "weak-study") weakPage();
       else {
         queue = currentSong.cards
           .map((card, index) => ({ card, song: currentSong, index }))
@@ -259,8 +269,14 @@ function renderCard(container) {
       `<span class="eyebrow">WORD NOTES</span><h2 lang="ko">${esc(card.word)}</h2><p>${esc(card.meaning)} · ${esc(card.pos)}</p>${card.examples.map((e, i) => `<section class="example"><small>使用例 ${i + 1}</small><p lang="ko"><strong>${esc(e.original_form)}</strong></p><p class="original" lang="ko">${esc(e.original_lyric)}</p><p class="translation">${esc(e.lyric_meaning)}</p><p class="grammar">${esc(e.grammar)}</p></section>`).join("")}`,
     );
 }
-function resultTile({ card, song, index }) {
-  return `<article class="result" data-song="${esc(song.id)}" data-index="${index}"><a class="result-link" href="#song/${encodeURIComponent(song.id)}/${index}"><strong lang="ko">${esc(card.word)}</strong><span class="meaning">　${esc(card.meaning)}</span><small>${esc(card.pos)} · ${esc(song.song)} / ${esc(song.artist)}</small><span class="learning-status">${isMastered(card) ? "✓ 覚えた" : isWeak(card) ? "♡ 苦手" : "未設定"}</span></a><div class="state-buttons"><button data-learning="weak" class="weak-toggle ${isWeak(card) ? "active" : ""}" aria-pressed="${isWeak(card)}" aria-label="${esc(card.word)}の苦手状態を切り替え">♡ 苦手</button><button data-learning="mastered" class="mastered-toggle ${isMastered(card) ? "active" : ""}" aria-pressed="${isMastered(card)}" aria-label="${esc(card.word)}の覚えた状態を切り替え">✓ 覚えた</button></div></article>`;
+function resultTile({ card, song, index }, entries = null) {
+  const meanings = entries
+    ? [...new Set(entries.map((x) => x.card.meaning))].join(" ／ ")
+    : card.meaning;
+  const sources = entries
+    ? [...new Set(entries.map((x) => x.song.song + " / " + x.song.artist))]
+    : [song.song + " / " + song.artist];
+  return `<article class="result" data-song="${esc(song.id)}" data-index="${index}"><a class="result-link" ${entries ? 'data-word-detail="true"' : ""} href="#song/${encodeURIComponent(song.id)}/${index}"><strong lang="ko">${esc(card.word)}</strong><span class="meaning">　${esc(meanings)}</span><small>${esc(card.pos)} · ${sources.map(esc).join("<br>")}</small><span class="learning-status">${isMastered(card) ? "✓ 覚えた" : isWeak(card) ? "♡ 苦手" : "未設定"}</span></a><div class="state-buttons"><button data-learning="weak" class="weak-toggle ${isWeak(card) ? "active" : ""}" aria-pressed="${isWeak(card)}" aria-label="${esc(card.word)}の苦手状態を切り替え">♡ 苦手</button><button data-learning="mastered" class="mastered-toggle ${isMastered(card) ? "active" : ""}" aria-pressed="${isMastered(card)}" aria-label="${esc(card.word)}の覚えた状態を切り替え">✓ 覚えた</button></div></article>`;
 }
 main.addEventListener("click", (e) => {
   const button = e.target.closest("[data-learning]");
@@ -271,7 +287,7 @@ main.addEventListener("click", (e) => {
   if (!card) return;
   safe(async () => {
     await commit(toggleLearningState(state, card, button.dataset.learning));
-    if (route === "weak") weakPage();
+    if (["words", "weak", "search"].includes(route)) updateWords();
     else {
       // Update all matching results without losing the search input or scroll position.
       main.querySelectorAll(".result").forEach((row) => {
@@ -284,77 +300,100 @@ main.addEventListener("click", (e) => {
     toast("全曲共通の学習状態を更新しました");
   });
 });
-function weakPage(study = false) {
+function weakPage() {
   const entries = allCards().filter((x) => isWeak(x.card));
   main.innerHTML = intro(
     "A LITTLE MORE PRACTICE",
-    "苦手単語",
-    "気になることばを、もう一度。全曲共通で保存。",
-    entries.length
-      ? `<button class="pink-button" id="weak-mode">${study ? "一覧を見る" : "カードで学習"}</button>`
-      : "",
+    "苦手単語の学習",
+    "全曲の苦手単語を、もう一度。",
+    '<button class="pink-button" id="weak-mode">単語一覧へ</button>',
   );
-  if (!entries.length) {
-    main.innerHTML += empty(
-      "まだ苦手単語はありません",
-      "カードの ♡ を押して、あとでもう一度。",
-      false,
-    );
-    return;
-  }
-  if (study) {
-    const seen = new Set();
-    queue = entries.filter((x) => {
-      const k = wordKey(x.card);
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-    main.innerHTML +=
-      '<div id="weak-cards"></div><p class="notice">同じ単語は1枚にまとめて表示します。各曲の使用例は一覧から確認できます。</p>';
-    renderCard($("#weak-cards"));
-  } else
-    main.innerHTML +=
-      `<p class="count">${new Set(entries.map((x) => wordKey(x.card))).size} 単語 · ${entries.length} 件の使用曲</p>` +
-      entries.map(resultTile).join("");
-  $("#weak-mode").onclick = () =>
-    (location.hash = study ? "weak" : "weak-study");
-}
-function searchPage() {
-  main.innerHTML =
-    intro(
-      "FIND YOUR WORDS",
-      "単語検索",
-      "すべての曲から、知りたいことばを探す。",
-    ) +
-    '<div class="search-wrap"><input id="word-search" type="search" placeholder="辞書形・活用形・日本語の意味" aria-label="単語を検索"></div><div id="results"></div>';
-  const update = () => {
-    const q = normalize($("#word-search").value);
-    if (!q) {
-      $("#results").innerHTML = empty(
-        "どんなことばを探しますか？",
-        "韓国語でも、日本語でも。",
+  const seen = new Set();
+  queue = entries.filter((x) => {
+    const key = wordKey(x.card);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  main.innerHTML += queue.length
+    ? '<div id="weak-cards"></div><p class="notice">同じ単語は1枚にまとめています。全曲の使用例は単語一覧から確認できます。</p>'
+    : empty(
+        "まだ苦手単語はありません",
+        "単語一覧から苦手を登録できます。",
         false,
       );
-      return;
-    }
-    const found = allCards().filter(({ card: c }) =>
-      [c.word, c.meaning, ...c.examples.map((e) => e.original_form)].some((s) =>
-        normalize(s).includes(q),
-      ),
-    );
-    $("#results").innerHTML =
-      `<div class="section-title"><h2>検索結果</h2><span class="count">${found.length} 件</span></div>` +
-      (found.map(resultTile).join("") ||
-        empty(
-          "見つかりませんでした",
-          "別のことばや活用形で検索してください。",
-          false,
-        ));
-  };
-  $("#word-search").oninput = update;
-  update();
+  if (queue.length) renderCard($("#weak-cards"));
+  $("#weak-mode").onclick = () => (location.hash = "words");
 }
+function wordGroups() {
+  const groups = new Map();
+  for (const entry of allCards()) {
+    const key = wordKey(entry.card);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  return [...groups.values()];
+}
+function wordsPage() {
+  main.innerHTML =
+    intro(
+      "ALL YOUR WORDS",
+      "単語一覧",
+      "すべての曲のことばを、ひとつの場所で。",
+    ) +
+    `<div class="search-wrap"><input id="word-search" type="search" placeholder="辞書形・活用形・日本語の意味" aria-label="単語を検索"></div>
+    <div class="tabs word-filters" aria-label="単語の絞り込み"><button data-filter="all">すべて</button><button data-filter="weak">♡ 苦手</button><button data-filter="mastered">✓ 覚えた</button></div>
+    <div class="row between"><span id="word-count" class="count" aria-live="polite"></span><button id="study-weak" class="pink-button">♡ 苦手だけ学習</button></div><div id="results"></div>`;
+  updateWords = () => {
+    const q = normalize($("#word-search").value);
+    const groups = wordGroups().filter(
+      (entries) =>
+        (wordFilter === "all" ||
+          learningStatus(state, entries[0].card) === wordFilter) &&
+        (!q ||
+          entries.some(({ card: c }) =>
+            [c.word, c.meaning, ...c.examples.map((e) => e.original_form)].some(
+              (v) => normalize(v).includes(q),
+            ),
+          )),
+    );
+    $("#word-count").textContent = `${groups.length} 単語`;
+    main.querySelectorAll("[data-filter]").forEach((b) => {
+      b.classList.toggle("selected", b.dataset.filter === wordFilter);
+      b.setAttribute("aria-pressed", b.dataset.filter === wordFilter);
+    });
+    $("#results").innerHTML =
+      groups.map((entries) => resultTile(entries[0], entries)).join("") ||
+      empty(
+        "該当する単語はありません",
+        "検索や絞り込みを変更してください。",
+        false,
+      );
+    $("#study-weak").disabled = !allCards().some((x) => isWeak(x.card));
+  };
+  $("#word-search").oninput = updateWords;
+  main.querySelectorAll("[data-filter]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        wordFilter = b.dataset.filter;
+        updateWords();
+      }),
+  );
+  $("#study-weak").onclick = () => (location.hash = "weak-study");
+  updateWords();
+}
+main.addEventListener("click", (e) => {
+  const link = e.target.closest("[data-word-detail]");
+  if (!link) return;
+  e.preventDefault();
+  const tile = link.closest(".result"),
+    song = state.songs.find((s) => s.id === tile.dataset.song),
+    card = song.cards[Number(tile.dataset.index)];
+  const entries = allCards().filter((x) => wordKey(x.card) === wordKey(card));
+  showDialog(
+    `<span class="eyebrow">ALL SONG EXAMPLES</span><h2 lang="ko">${esc(card.word)}</h2>${entries.map(({ card: c, song, index }) => `<section class="example"><h3>${esc(song.song)}</h3><small>${esc(song.artist)} · ${esc(c.pos)}</small><p>${esc(c.meaning)}</p>${c.examples.map((ex) => `<p lang="ko"><strong>${esc(ex.original_form)}</strong> · ${esc(ex.original_lyric)}</p><p class="translation">${esc(ex.lyric_meaning)}</p><p class="grammar">${esc(ex.grammar)}</p>`).join("")}<a class="back" href="#song/${encodeURIComponent(song.id)}/${index}">この曲で確認 →</a></section>`).join("")}`,
+  );
+});
 function importPage() {
   main.innerHTML =
     intro(
@@ -432,11 +471,14 @@ function exportBackup() {
   const keys = new Set(allCards().map((x) => wordKey(x.card)));
   const backup = {
     app: "K-LYRIC",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     songs: state.songs.map(({ id, ...song }) => song),
     weak: state.weak.filter((k) => keys.has(k)),
     mastered: state.mastered.filter((k) => keys.has(k)),
+    ...(state.learningMigration
+      ? { learningMigration: state.learningMigration }
+      : {}),
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {
     type: "application/json",
@@ -461,17 +503,22 @@ function render() {
   document.querySelectorAll("[data-nav]").forEach((a) => {
     const active =
       a.dataset.nav ===
-      (route === "song" ? "library" : route === "weak-study" ? "weak" : route);
+      (route === "song"
+        ? "library"
+        : ["weak-study", "weak", "search"].includes(route)
+          ? "words"
+          : route);
     a.classList.toggle("active", active);
     if (active) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   if (route === "song")
     renderSong(decodeURIComponent(parts[1] || ""), parts[2]);
-  else if (route === "weak" || route === "weak-study")
-    weakPage(route === "weak-study");
-  else if (route === "search") searchPage();
-  else if (route === "import") importPage();
+  else if (route === "weak-study") weakPage();
+  else if (["words", "weak", "search"].includes(route)) {
+    wordFilter = route === "weak" ? "weak" : "all";
+    wordsPage();
+  } else if (route === "import") importPage();
   else library();
   window.scrollTo(0, 0);
   main.focus({ preventScroll: true });
@@ -479,8 +526,10 @@ function render() {
 window.addEventListener("hashchange", render);
 try {
   const saved = await openStore();
-  if (saved) state = { ...saved, mastered: saved.mastered || [] };
-  else {
+  if (saved) {
+    state = migrateLearningState(saved);
+    if (state !== saved) await saveStore(state);
+  } else {
     state.songs = [{ ...validateSong(demo), id: crypto.randomUUID() }];
     await saveStore(state);
   }
