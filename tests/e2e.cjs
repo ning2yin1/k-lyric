@@ -113,7 +113,7 @@ const fs = require("node:fs/promises");
   await go("search");
   await page.locator("#word-search").fill("빛이");
   assert.equal(await page.locator(".result").count(), 2);
-  await page.locator(".result").last().click();
+  await page.locator(".result-link").last().click();
   assert.equal(await page.locator(".word").textContent(), "빛");
   await go("search");
   await page.locator("#word-search").fill("光");
@@ -143,15 +143,13 @@ const fs = require("node:fs/promises");
   );
   assert.equal(backup.songs.length, 2);
   assert.equal(backup.weak.length, 1);
-  await page
-    .locator("#restore-file")
-    .setInputFiles({
-      name: "invalid.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(
-        '{"app":"K-LYRIC","version":1,"songs":[],"weak":["invalid"]}',
-      ),
-    });
+  await page.locator("#restore-file").setInputFiles({
+    name: "invalid.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      '{"app":"K-LYRIC","version":1,"songs":[],"weak":["invalid"]}',
+    ),
+  });
   await page
     .locator("#backup-error")
     .filter({ hasText: "正しくありません" })

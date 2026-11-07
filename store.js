@@ -2,6 +2,24 @@ export const normalize = (s) =>
   s.normalize("NFKC").trim().toLocaleLowerCase("ja");
 export const wordKey = (c) =>
   JSON.stringify([normalize(c.word), normalize(c.pos), normalize(c.meaning)]);
+// Preserve the existing lexical identity, including meaning, for both states.
+export function toggleLearningState(state, card, kind) {
+  const key = wordKey(card);
+  const active = (state[kind] || []).includes(key);
+  const next = {
+    ...state,
+    weak: [...state.weak],
+    mastered: [...(state.mastered || [])],
+  };
+  next[kind] = active
+    ? next[kind].filter((k) => k !== key)
+    : [...next[kind], key];
+  if (!active) {
+    const other = kind === "weak" ? "mastered" : "weak";
+    next[other] = next[other].filter((k) => k !== key);
+  }
+  return next;
+}
 export const songKey = (s) =>
   JSON.stringify([normalize(s.song), normalize(s.artist)]);
 const object = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
@@ -69,8 +87,8 @@ export function validateSong(s, path = "曲") {
   return clean;
 }
 export function validateBackup(b) {
-  if (!object(b) || b.app !== "K-LYRIC" || b.version !== 1)
-    throw Error("K-LYRIC バージョン1のバックアップを選択してください。");
+  if (!object(b) || b.app !== "K-LYRIC" || ![1, 2].includes(b.version))
+    throw Error("K-LYRIC バージョン1または2のバックアップを選択してください。");
   if (!Array.isArray(b.songs) || b.songs.length > 1000)
     throw Error("songs は1,000曲以下の配列にしてください。");
   const songs = b.songs.map((s, i) => ({
@@ -85,7 +103,20 @@ export function validateBackup(b) {
     !b.weak.every((k) => typeof k === "string" && keys.has(k))
   )
     throw Error("苦手マークのデータが正しくありません。");
-  return { songs, weak: [...new Set(b.weak)], initialized: true };
+  const mastered = b.version === 1 ? [] : b.mastered;
+  if (
+    !Array.isArray(mastered) ||
+    !mastered.every((k) => typeof k === "string" && keys.has(k))
+  )
+    throw Error("覚えたマークのデータが正しくありません。");
+  if (mastered.some((k) => b.weak.includes(k)))
+    throw Error("同じ単語に苦手と覚えたを同時に設定することはできません。");
+  return {
+    songs,
+    weak: [...new Set(b.weak)],
+    mastered: [...new Set(mastered)],
+    initialized: true,
+  };
 }
 export function parseJSON(source) {
   if (source.length > 20 * 1024 * 1024)

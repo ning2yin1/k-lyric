@@ -731,3 +731,40 @@ dialog button {
 dialog p {
   overflow-wrap: anywhere;
 }
+
+.state-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.mastered-toggle {
+  background: #f2edf9;
+  color: #796391;
+  border: 1px solid #ddd0ef;
+}
+.mastered-toggle.active,
+.pill.learned {
+  background: #e9def7;
+  color: #71548a;
+}
+.result {
+  flex-direction: column;
+  gap: 12px;
+}
+.result-link {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.result .state-buttons button {
+  font-size: 12px;
+  min-height: 44px;
+  padding: 8px 13px;
+}
+.learning-status {
+  display: block;
+  color: #796391;
+  font-size: 12px;
+  margin-top: 5px;
+}

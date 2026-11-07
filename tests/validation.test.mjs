@@ -60,3 +60,43 @@ test("backup validates all data before replacement, ignores foreign fields", () 
     0,
   );
 });
+
+test("mastered backup validates identities and rejects conflicting states", () => {
+  const key = wordKey(demo.cards[0]);
+  const backup = {
+    app: "K-LYRIC",
+    version: 2,
+    songs: [demo],
+    weak: [],
+    mastered: [key],
+  };
+  assert.deepEqual(validateBackup(backup).mastered, [key]);
+  for (const invalid of [
+    { ...backup, mastered: ["invalid"] },
+    { ...backup, mastered: null },
+    { ...backup, weak: [key] },
+  ])
+    assert.throws(() => validateBackup(invalid));
+  assert.deepEqual(
+    validateBackup({ ...backup, version: 1, weak: [key] }).mastered,
+    [],
+  );
+});
+test("learning states toggle exclusively without changing songs or other words", async () => {
+  const { toggleLearningState } = await import("../store.js");
+  const card = demo.cards[0],
+    key = wordKey(card),
+    other = wordKey(demo.cards[1]);
+  const old = { songs: [demo], weak: [key, other] };
+  const learned = toggleLearningState(old, card, "mastered");
+  assert.deepEqual(old.weak, [key, other]);
+  assert.equal(learned.songs, old.songs);
+  assert.deepEqual(learned.mastered, [key]);
+  assert.deepEqual(learned.weak, [other]);
+  const unset = toggleLearningState(learned, card, "mastered");
+  assert.deepEqual(unset.mastered, []);
+  const weak = toggleLearningState(learned, card, "weak");
+  assert.deepEqual(weak.mastered, []);
+  assert.ok(weak.weak.includes(key));
+  assert.ok(!toggleLearningState(weak, card, "weak").weak.includes(key));
+});

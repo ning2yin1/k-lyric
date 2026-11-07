@@ -1,6 +1,7 @@
 import { demo, template } from "./data.js";
 import {
   normalize,
+  toggleLearningState,
   wordKey,
   songKey,
   validateSong,
@@ -20,7 +21,7 @@ const esc = (s) =>
         c
       ],
   );
-let state = { songs: [], weak: [], initialized: true },
+let state = { songs: [], weak: [], mastered: [], initialized: true },
   cardIndex = 0,
   flipped = false,
   currentMode = "lyrics",
@@ -70,6 +71,7 @@ async function safe(action) {
   }
 }
 const isWeak = (c) => state.weak.includes(wordKey(c));
+const isMastered = (c) => state.mastered.includes(wordKey(c));
 const allCards = () =>
   state.songs.flatMap((song) =>
     song.cards.map((card, index) => ({ song, card, index })),
@@ -122,22 +124,28 @@ function renderSong(id, target) {
     return;
   }
   if (target !== undefined) {
-    currentMode = "cards";
-    cardIndex = Number(target) || 0;
+    currentMode =
+      currentSong.cards[Number(target)] &&
+      isMastered(currentSong.cards[Number(target)])
+        ? "list"
+        : "cards";
   }
-  queue = currentSong.cards.map((card, index) => ({
-    card,
-    song: currentSong,
-    index,
-  }));
+  queue = currentSong.cards
+    .map((card, index) => ({ card, song: currentSong, index }))
+    .filter((x) => !isMastered(x.card));
+  if (target !== undefined)
+    cardIndex = Math.max(
+      0,
+      queue.findIndex((x) => x.index === Number(target)),
+    );
   main.innerHTML =
     `<a href="#library" class="back">← ライブラリ</a>` +
     intro(
       "IN YOUR LYRICS",
       esc(currentSong.song),
-      `${esc(currentSong.artist)} · ${currentSong.cards.length} 単語`,
+      `${esc(currentSong.artist)}`,
     ) +
-    `<div class="tabs" role="tablist" aria-label="表示モード"><button id="lyrics-tab" role="tab" class="${currentMode === "lyrics" ? "selected" : ""}" aria-selected="${currentMode === "lyrics"}">歌詞</button><button id="cards-tab" role="tab" class="${currentMode === "cards" ? "selected" : ""}" aria-selected="${currentMode === "cards"}">単語カード</button></div><div id="song-content"></div><div class="row between"><p class="notice">歌詞・使用例は、この曲だけに保存されます。</p><button id="delete-song" class="text-button">曲を削除</button></div>`;
+    `<div id="song-stats" class="pills" aria-live="polite"></div><div class="tabs" role="tablist" aria-label="表示モード"><button id="lyrics-tab" role="tab" class="${currentMode === "lyrics" ? "selected" : ""}" aria-selected="${currentMode === "lyrics"}">歌詞</button><button id="cards-tab" role="tab" class="${currentMode === "cards" ? "selected" : ""}" aria-selected="${currentMode === "cards"}">単語カード</button><button id="list-tab" role="tab" class="${currentMode === "list" ? "selected" : ""}" aria-selected="${currentMode === "list"}">単語一覧</button></div><div id="song-content"></div><div class="row between"><p class="notice">歌詞・使用例は、この曲だけに保存されます。</p><button id="delete-song" class="text-button">曲を削除</button></div>`;
   $("#lyrics-tab").onclick = () => {
     currentMode = "lyrics";
     renderSong(id);
@@ -146,7 +154,22 @@ function renderSong(id, target) {
     currentMode = "cards";
     renderSong(id);
   };
-  if (currentMode === "lyrics")
+  updateSongStats();
+  $("#list-tab").onclick = () => {
+    currentMode = "list";
+    renderSong(id);
+  };
+  if (currentMode === "list") {
+    $("#song-content").innerHTML =
+      currentSong.cards
+        .map((card, index) => resultTile({ card, song: currentSong, index }))
+        .join("") ||
+      empty(
+        "単語がありません",
+        "この曲にはカードが登録されていません。",
+        false,
+      );
+  } else if (currentMode === "lyrics")
     $("#song-content").innerHTML =
       `<div class="lyrics">${currentSong.lyrics.map((l) => `<div class="lyric"><p class="original" lang="ko">${esc(l.original)}</p><p class="translation">${esc(l.translation)}</p></div>`).join("")}</div>`;
   else renderCard($("#song-content"));
@@ -166,8 +189,22 @@ function renderSong(id, target) {
       });
   };
 }
+function updateSongStats() {
+  if (!$("#song-stats")) return;
+  const learned = currentSong.cards.filter(isMastered).length;
+  $("#song-stats").innerHTML =
+    `<span class="pill">登録 ${currentSong.cards.length} 単語</span><span class="pill learned">✓ 覚えた ${learned} 単語</span><span class="pill">未習得 ${currentSong.cards.length - learned} 単語</span>`;
+}
 function renderCard(container) {
   if (!queue.length) {
+    if (route === "song" && currentSong.cards.length) {
+      container.innerHTML = empty(
+        "この曲の単語はすべて覚えました！",
+        "単語一覧からいつでも見直せます。",
+        false,
+      );
+      return;
+    }
     container.innerHTML = empty(
       "カードがありません",
       "カードが含まれた曲を取り込んでください。",
@@ -176,7 +213,7 @@ function renderCard(container) {
   }
   cardIndex = Math.max(0, Math.min(cardIndex, queue.length - 1));
   const { card, song } = queue[cardIndex];
-  container.innerHTML = `<div class="row between"><span class="count">${cardIndex + 1} / ${queue.length} WORDS</span><button class="weak-toggle ${isWeak(card) ? "active" : ""}" id="toggle-weak" aria-pressed="${isWeak(card)}">${isWeak(card) ? "♥ 苦手に登録済み" : "♡ 苦手に登録"}</button></div><button class="flashcard ${flipped ? "flipped" : ""}" id="flip" aria-label="${flipped ? "カードの表面を表示" : "カードの裏面を表示"}">${flipped ? `<small>MEANING</small><span class="meaning">${esc(card.meaning)}</span><span class="pron" lang="ko">[ ${esc(card.pronunciation)} ]</span><span class="pill">${esc(card.pos)}</span>` : `<small>KOREAN WORD</small><span class="word" lang="ko">${esc(card.word)}</span>`}<small>タップして${flipped ? "表" : "裏"}を見る ↻</small></button><p class="count" style="text-align:center">${esc(song.song)} · ${esc(song.artist)}</p><div class="card-controls"><button id="prev" class="secondary" ${cardIndex === 0 ? "disabled" : ""} aria-label="前のカード">← 前へ</button><button id="detail" class="text-button">詳しい解説 ↗</button><button id="next" class="secondary" ${cardIndex === queue.length - 1 ? "disabled" : ""} aria-label="次のカード">次へ →</button></div>`;
+  container.innerHTML = `<div class="row between"><span class="count">${cardIndex + 1} / ${queue.length} WORDS</span><div class="state-buttons"><button class="weak-toggle ${isWeak(card) ? "active" : ""}" id="toggle-weak" aria-pressed="${isWeak(card)}">${isWeak(card) ? "♥ 苦手に登録済み" : "♡ 苦手に登録"}</button><button class="mastered-toggle" id="toggle-mastered" aria-pressed="false">✓ 覚えた</button></div></div><button class="flashcard ${flipped ? "flipped" : ""}" id="flip" aria-label="${flipped ? "カードの表面を表示" : "カードの裏面を表示"}">${flipped ? `<small>MEANING</small><span class="meaning">${esc(card.meaning)}</span><span class="pron" lang="ko">[ ${esc(card.pronunciation)} ]</span><span class="pill">${esc(card.pos)}</span>` : `<small>KOREAN WORD</small><span class="word" lang="ko">${esc(card.word)}</span>`}<small>タップして${flipped ? "表" : "裏"}を見る ↻</small></button><p class="count" style="text-align:center">${esc(song.song)} · ${esc(song.artist)}</p><div class="card-controls"><button id="prev" class="secondary" ${cardIndex === 0 ? "disabled" : ""} aria-label="前のカード">← 前へ</button><button id="detail" class="text-button">詳しい解説 ↗</button><button id="next" class="secondary" ${cardIndex === queue.length - 1 ? "disabled" : ""} aria-label="次のカード">次へ →</button></div>`;
   $("#flip").onclick = () => {
     flipped = !flipped;
     renderCard(container);
@@ -191,29 +228,62 @@ function renderCard(container) {
     flipped = false;
     renderCard(container);
   };
-  $("#toggle-weak").onclick = () =>
+  const setCardState = (kind) =>
     safe(async () => {
-      const key = wordKey(card),
-        weak = isWeak(card)
-          ? state.weak.filter((k) => k !== key)
-          : [...state.weak, key];
-      await commit({ ...state, weak });
+      const previous = queue[cardIndex];
+      await commit(toggleLearningState(state, card, kind));
+      flipped = false;
       if (route === "weak-study") weakPage(true);
-      else renderCard(container);
+      else {
+        queue = currentSong.cards
+          .map((card, index) => ({ card, song: currentSong, index }))
+          .filter((x) => !isMastered(x.card));
+        // Prefer the next original position; wrap to earlier remaining cards at the end.
+        if (kind === "mastered") {
+          const next = queue.findIndex((x) => x.index > previous.index);
+          cardIndex = next >= 0 ? next : 0;
+        }
+        updateSongStats();
+        renderCard(container);
+      }
       toast(
-        weak.includes(key)
-          ? "全曲共通の苦手マークを付けました"
-          : "全曲の苦手マークを解除しました",
+        kind === "mastered"
+          ? "全曲共通で覚えたに変更しました"
+          : "苦手マークを更新しました",
       );
     });
+  $("#toggle-weak").onclick = () => setCardState("weak");
+  $("#toggle-mastered").onclick = () => setCardState("mastered");
   $("#detail").onclick = () =>
     showDialog(
       `<span class="eyebrow">WORD NOTES</span><h2 lang="ko">${esc(card.word)}</h2><p>${esc(card.meaning)} · ${esc(card.pos)}</p>${card.examples.map((e, i) => `<section class="example"><small>使用例 ${i + 1}</small><p lang="ko"><strong>${esc(e.original_form)}</strong></p><p class="original" lang="ko">${esc(e.original_lyric)}</p><p class="translation">${esc(e.lyric_meaning)}</p><p class="grammar">${esc(e.grammar)}</p></section>`).join("")}`,
     );
 }
 function resultTile({ card, song, index }) {
-  return `<a class="result" href="#song/${encodeURIComponent(song.id)}/${index}"><div><strong lang="ko">${esc(card.word)}</strong><span class="meaning">　${esc(card.meaning)}</span><small>${esc(card.pos)} · ${esc(song.song)} / ${esc(song.artist)}</small></div><span aria-hidden="true">↗</span></a>`;
+  return `<article class="result" data-song="${esc(song.id)}" data-index="${index}"><a class="result-link" href="#song/${encodeURIComponent(song.id)}/${index}"><strong lang="ko">${esc(card.word)}</strong><span class="meaning">　${esc(card.meaning)}</span><small>${esc(card.pos)} · ${esc(song.song)} / ${esc(song.artist)}</small><span class="learning-status">${isMastered(card) ? "✓ 覚えた" : isWeak(card) ? "♡ 苦手" : "未設定"}</span></a><div class="state-buttons"><button data-learning="weak" class="weak-toggle ${isWeak(card) ? "active" : ""}" aria-pressed="${isWeak(card)}" aria-label="${esc(card.word)}の苦手状態を切り替え">♡ 苦手</button><button data-learning="mastered" class="mastered-toggle ${isMastered(card) ? "active" : ""}" aria-pressed="${isMastered(card)}" aria-label="${esc(card.word)}の覚えた状態を切り替え">✓ 覚えた</button></div></article>`;
 }
+main.addEventListener("click", (e) => {
+  const button = e.target.closest("[data-learning]");
+  if (!button) return;
+  const tile = button.closest(".result");
+  const song = state.songs.find((s) => s.id === tile.dataset.song);
+  const card = song?.cards[Number(tile.dataset.index)];
+  if (!card) return;
+  safe(async () => {
+    await commit(toggleLearningState(state, card, button.dataset.learning));
+    if (route === "weak") weakPage();
+    else {
+      // Update all matching results without losing the search input or scroll position.
+      main.querySelectorAll(".result").forEach((row) => {
+        const song = state.songs.find((s) => s.id === row.dataset.song),
+          index = Number(row.dataset.index);
+        row.outerHTML = resultTile({ card: song.cards[index], song, index });
+      });
+      updateSongStats();
+    }
+    toast("全曲共通の学習状態を更新しました");
+  });
+});
 function weakPage(study = false) {
   const entries = allCards().filter((x) => isWeak(x.card));
   main.innerHTML = intro(
@@ -332,7 +402,7 @@ function importPage() {
         throw Error("ファイルは20MB以下にしてください。");
       const next = validateBackup(parseJSON(await file.text()));
       showDialog(
-        `<h2>バックアップを復元しますか？</h2><p>${next.songs.length} 曲・${next.weak.length} 個の苦手マークを復元します。</p><p class="notice">現在の ${state.songs.length} 曲をすべて置き換えます。必要なデータは先にバックアップしてください。</p><button id="confirm-restore" class="pink-button">この内容で復元する</button>`,
+        `<h2>バックアップを復元しますか？</h2><p>${next.songs.length} 曲・${next.weak.length} 個の苦手マーク・${next.mastered.length} 個の覚えたマークを復元します。</p><p class="notice">現在の ${state.songs.length} 曲をすべて置き換えます。必要なデータは先にバックアップしてください。</p><button id="confirm-restore" class="pink-button">この内容で復元する</button>`,
       );
       $("#confirm-restore").onclick = () =>
         safe(async () => {
@@ -362,10 +432,11 @@ function exportBackup() {
   const keys = new Set(allCards().map((x) => wordKey(x.card)));
   const backup = {
     app: "K-LYRIC",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     songs: state.songs.map(({ id, ...song }) => song),
     weak: state.weak.filter((k) => keys.has(k)),
+    mastered: state.mastered.filter((k) => keys.has(k)),
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {
     type: "application/json",
@@ -408,7 +479,7 @@ function render() {
 window.addEventListener("hashchange", render);
 try {
   const saved = await openStore();
-  if (saved) state = saved;
+  if (saved) state = { ...saved, mastered: saved.mastered || [] };
   else {
     state.songs = [{ ...validateSong(demo), id: crypto.randomUUID() }];
     await saveStore(state);
